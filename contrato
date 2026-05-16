@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Contrato Digital</title>
+
+<style>
+
+body{
+  font-family:Arial;
+  max-width:800px;
+  margin:auto;
+  padding:20px;
+  line-height:1.6;
+}
+
+h1{
+  text-align:center;
+}
+
+canvas{
+  border:2px dashed black;
+  width:100%;
+  height:200px;
+  margin-top:20px;
+  touch-action:none;
+}
+
+button{
+  margin-top:15px;
+  padding:12px;
+  font-size:16px;
+  cursor:pointer;
+}
+
+.assinatura-img{
+  margin-top:20px;
+  max-width:300px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>TERMO DE COMPROMISSO DE PAGAMENTO</h1>
+
+<p>
+Eu, <b id="nome"></b>, portador(a) do CPF
+<b id="cpf"></b>, declaro que se aprovado vai receber de o valor de
+<b>R$ <span id="valor"></span></b>,
+mediante transferência via PIX.
+</p>
+
+<p>
+O valor será liberado após aprovação da operação PIX,
+considerando-se como data inicial deste contrato o momento
+da confirmação do pagamento.
+</p>
+
+<p>
+Comprometo-me a realizar o pagamento no prazo de
+<b id="prazo"></b>, contado a partir da data de recebimento.
+</p>
+
+<p>
+Valor total a pagar com acréscimo contratual de :
+<b>R$ <span id="valorTotal"></span></b>
+</p>
+
+<p>
+Estou ciente de que, após o vencimento do prazo acordado,
+será aplicada multa diária de <b>R$ 5,00 (cinco reais)</b>
+até a regularização total da dívida.
+</p>
+
+<p>
+Declaro que li, compreendi e concordo com todos os termos
+deste compromisso financeiro, reconhecendo este documento
+como válido em meio digital e assinado eletronicamente.
+</p>
+
+<h3>Assine abaixo:</h3>
+
+<canvas id="assinatura"></canvas>
+
+<br>
+
+<button onclick="limpar()">Limpar</button>
+<button onclick="salvar()">Salvar Assinatura</button>
+<button onclick="window.print()">Imprimir / PDF</button>
+
+<img id="preview" class="assinatura-img">
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDw5F9h-PvLwv2fENNIbrmOc3qSXxa__Uo",
+  authDomain: "emprestimo-cf2bb.firebaseapp.com",
+  databaseURL: "https://emprestimo-cf2bb-default-rtdb.firebaseio.com",
+  projectId: "emprestimo-cf2bb",
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.database();
+const dados = JSON.parse(localStorage.getItem("contrato"));
+
+document.getElementById("nome").innerText = dados.nome;
+document.getElementById("cpf").innerText = dados.cpf;
+const valorOriginal = parseFloat(dados.valor);
+
+const valorTotal = valorOriginal * 1.30;
+
+document.getElementById("valor").innerText =
+valorOriginal.toFixed(2);
+
+document.getElementById("valorTotal").innerText =
+valorTotal.toFixed(2);
+
+document.getElementById("prazo").innerText = dados.prazo;
+
+const canvas = document.getElementById("assinatura");
+const ctx = canvas.getContext("2d");
+
+canvas.width = canvas.offsetWidth;
+canvas.height = canvas.offsetHeight;
+
+let desenhando = false;
+
+function pegarPosicao(e){
+
+  const rect = canvas.getBoundingClientRect();
+
+  if(e.touches){
+    return {
+      x:e.touches[0].clientX - rect.left,
+      y:e.touches[0].clientY - rect.top
+    };
+  }
+
+  return {
+    x:e.clientX - rect.left,
+    y:e.clientY - rect.top
+  };
+
+}
+
+function iniciar(e){
+  desenhando = true;
+  ctx.beginPath();
+}
+
+function desenhar(e){
+
+  if(!desenhando) return;
+
+  e.preventDefault();
+
+  const pos = pegarPosicao(e);
+
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.lineTo(pos.x,pos.y);
+  ctx.stroke();
+
+}
+
+function parar(){
+  desenhando = false;
+}
+
+canvas.addEventListener("mousedown", iniciar);
+canvas.addEventListener("mousemove", desenhar);
+canvas.addEventListener("mouseup", parar);
+
+canvas.addEventListener("touchstart", iniciar);
+canvas.addEventListener("touchmove", desenhar);
+canvas.addEventListener("touchend", parar);
+
+function limpar(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+async function salvar(){
+
+  const imagem = canvas.toDataURL("image/png");
+
+  const id = localStorage.getItem("contratoID");
+
+  if(!id){
+    alert("Erro ao localizar contrato");
+    return;
+  }
+
+  // salva assinatura no firebase
+  await db.ref("emprestimos/" + id).update({
+  assinatura: imagem,
+  assinado: true,
+  valorTotal: valorTotal,
+  dataAssinatura: new Date().toLocaleString()
+});
+
+  document.getElementById("preview").src = imagem;
+
+  alert("Contrato assinado com sucesso ✅");
+
+}
+</script>
+
+</body>
+</html>

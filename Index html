@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Empréstimo Rápido</title>
+
+<style>
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:Arial;
+}
+
+body{
+  background:#0f172a;
+  color:white;
+  padding:140px 20px 20px;
+}
+
+.container{
+  max-width:500px;
+  margin:auto;
+  background:#1e293b;
+  padding:20px;
+  border-radius:15px;
+}
+
+h1{
+  text-align:center;
+  margin-bottom:20px;
+}
+
+input, select, button{
+  width:100%;
+  padding:14px;
+  margin-top:12px;
+  border:none;
+  border-radius:10px;
+  font-size:16px;
+}
+
+input, select{
+  background:#334155;
+  color:white;
+}
+
+button{
+  background:#22c55e;
+  color:white;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#16a34a;
+}
+
+.preview{
+  width:100%;
+  margin-top:15px;
+  border-radius:10px;
+  display:none;
+}
+.linha{
+  display:flex;
+  gap:10px;
+}
+
+.linha input{
+  width:100%;
+}
+.resultado{
+  background:#0f172a;
+  border:1px solid #334155;
+  padding:15px;
+  border-radius:10px;
+  margin-top:12px;
+  text-align:center;
+  font-size:18px;
+  font-weight:bold;
+  color:#22c55e;
+}
+.topo-fixo{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  background:#1e293b;
+  padding:15px;
+  text-align:center;
+  z-index:999;
+  border-bottom:1px solid #334155;
+}
+
+.topo-fixo h1{
+  margin-bottom:8px;
+}
+
+.resultado{
+  background:#0f172a;
+  border:1px solid #334155;
+  padding:10px;
+  border-radius:10px;
+  font-size:18px;
+  font-weight:bold;
+  color:#22c55e;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topo-fixo">
+  <h1>Empréstimo Rápido</h1>
+
+  <div id="resultado" class="resultado">
+    Valor total a pagar: R$ 0,00
+  </div>
+</div>
+
+<div class="container">
+
+<input type="number" id="valor" placeholder="Valor do empréstimo" max="300">
+
+<input type="text" id="nome" placeholder="Nome completo">
+
+<input type="tel" id="cpf" placeholder="CPF"maxlength="14"oninput="formatarCPF(this)"
+>
+
+<input type="tel" id="telefone" placeholder="Telefone"maxlength="15"oninput="formatarTelefone(this)">
+
+<input type="text" id="pix" placeholder="Chave PIX (CPF, Email, Telefone ou Aleatória)">
+
+<input type="text" id="cep" placeholder="CEP">
+
+<input type="text" id="rua" placeholder="Rua">
+
+<input type="text" id="bairro" placeholder="Bairro">
+
+<div class="linha">
+
+  <input type="text" id="cidade" placeholder="Cidade">
+
+  <input type="text" id="estado" placeholder="Estado">
+
+</div>
+
+<input type="number" id="numero" placeholder="Número da casa">
+
+<input type="text" id="referencia" placeholder="Ponto de referência">
+
+<input type="text" id="indicacao" placeholder="Indicação (opcional)">
+
+<select id="prazo">
+  <option value="">Escolha o prazo</option>
+  <option value="10 dias + 10%">10 dias = 10%</option>
+  <option value="20 dias + 20%">20 dias = 20%</option>
+  <option value="30 dias + 30%">30 dias = 30%</option>
+</select>
+
+<input type="file" id="rg" accept="image/*">
+
+<img id="preview" class="preview">
+
+<button onclick="enviar()">ENVIAR</button>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDw5F9h-PvLwv2fENNIbrmOc3qSXxa__Uo",
+  authDomain: "emprestimo-cf2bb.firebaseapp.com",
+  databaseURL: "https://emprestimo-cf2bb-default-rtdb.firebaseio.com",
+  projectId: "emprestimo-cf2bb",
+  messagingSenderId: "545934886415",
+  appId: "1:545934886415:web:3088355b8bb33f279d857a"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.database();
+
+const rgInput = document.getElementById("rg");
+const preview = document.getElementById("preview");
+
+rgInput.addEventListener("change", function(){
+
+  const file = this.files[0];
+
+  if(file){
+
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = "block";
+
+  }
+
+});
+
+document.getElementById("cep").addEventListener("blur", async function(){
+
+  const cep = this.value.replace(/\D/g, '');
+
+  if(cep.length !== 8){
+    return;
+  }
+
+  try{
+
+    const resposta = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+
+    const dados = await resposta.json();
+
+    if(dados.erro){
+
+      alert("CEP não encontrado");
+      return;
+
+    }
+
+    document.getElementById("rua").value = dados.logradouro || "";
+    document.getElementById("bairro").value = dados.bairro || "";
+    document.getElementById("cidade").value = dados.localidade || "";
+    document.getElementById("estado").value = dados.uf || "";
+
+  }catch(erro){
+
+    alert("Erro ao buscar CEP");
+
+  }
+
+});
+
+function validarCPF(cpf){
+
+  cpf = cpf.replace(/\D/g,'');
+
+  if(cpf.length !== 11) return false;
+
+  // bloqueia CPFs iguais
+  if(/^(\d)\1+$/.test(cpf)) return false;
+
+  let soma = 0;
+  let resto;
+
+  for(let i=1;i<=9;i++)
+    soma += parseInt(cpf.substring(i-1,i))*(11-i);
+
+  resto = (soma*10)%11;
+
+  if(resto==10 || resto==11) resto=0;
+  if(resto!=parseInt(cpf.substring(9,10))) return false;
+
+  soma = 0;
+
+  for(let i=1;i<=10;i++)
+    soma += parseInt(cpf.substring(i-1,i))*(12-i);
+
+  resto = (soma*10)%11;
+
+  if(resto==10 || resto==11) resto=0;
+  if(resto!=parseInt(cpf.substring(10,11))) return false;
+
+  return true;
+}
+
+async function enviar(){
+
+  
+
+  const valor = document.getElementById("valor").value;
+  const nome = document.getElementById("nome").value;
+  const cpf = document.getElementById("cpf").value;
+  
+if(!validarCPF(cpf)){
+  alert("CPF inválido!");
+  return;
+}
+
+  const telefone = document.getElementById("telefone").value;
+  const pix = document.getElementById("pix").value; // 
+  
+  const endereco = {
+    rua: document.getElementById("rua").value,
+    bairro: document.getElementById("bairro").value,
+    cidade: document.getElementById("cidade").value,
+    estado: document.getElementById("estado").value,
+    numero: document.getElementById("numero").value
+  };
+
+  const cep = document.getElementById("cep").value;
+  const referencia = document.getElementById("referencia").value;
+  const indicacao = document.getElementById("indicacao").value;
+  const prazo = document.getElementById("prazo").value;
+
+  if(
+  !valor ||
+  !nome ||
+  !cpf ||
+  !telefone ||
+  !pix ||
+  !cep ||
+  !endereco.rua ||
+  !endereco.bairro ||
+  !endereco.cidade ||
+  !endereco.estado ||
+  !endereco.numero ||
+  !referencia ||
+  !prazo
+){
+    alert("Preencha todos os campos");
+    return;
+  }
+
+  try{
+
+    const dados = {
+  valor,
+  nome,
+  cpf,
+  telefone,
+  pix, // ✅ ADICIONAR
+  endereco,
+  cep,
+  referencia,
+  indicacao,
+  prazo,
+  data: new Date().toLocaleString()
+};
+
+    // salva no firebase
+const novo = db.ref("emprestimos").push();
+
+await novo.set(dados);
+
+// salva ID do cliente
+localStorage.setItem("contratoID", novo.key);
+
+    // 🔥 salva dados para o contrato
+    localStorage.setItem("contrato", JSON.stringify({
+  nome,
+  cpf,
+  valor,
+  prazo
+}));
+
+
+
+    // 🔥 abre contrato automaticamente
+    window.location.href = "contrato.html";
+
+  }catch(erro){
+
+    console.log(erro);
+    alert("Erro ao enviar");
+
+  }
+
+}
+
+const valorInput = document.getElementById("valor");
+const prazoInput = document.getElementById("prazo");
+const resultado = document.getElementById("resultado");
+
+function calcularTotal(){
+
+  let valor = Number(valorInput.value);
+
+  if(valor > 300){
+
+    valor = 300;
+    valorInput.value = 300;
+
+    alert("1°emprestimo limite é ate R$ 300");
+
+  }
+
+  const prazo = prazoInput.value;
+
+  let total = valor;
+
+  if(prazo.includes("10%")){
+
+    total = valor + (valor * 0.10);
+
+  }
+
+  if(prazo.includes("20%")){
+
+    total = valor + (valor * 0.20);
+
+  }
+
+  if(prazo.includes("30%")){
+
+    total = valor + (valor * 0.30);
+
+  }
+
+  resultado.innerHTML = `
+    Valor total: R$ ${total.toFixed(2)}
+  `;
+
+}
+
+valorInput.addEventListener("input", calcularTotal);
+
+prazoInput.addEventListener("change", calcularTotal);
+
+function formatarCPF(campo){
+
+  let valor = campo.value.replace(/\D/g,'');
+
+  valor = valor.replace(/(\d{3})(\d)/,'$1.$2');
+  valor = valor.replace(/(\d{3})(\d)/,'$1.$2');
+  valor = valor.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+
+  campo.value = valor;
+
+}
+
+
+function formatarTelefone(campo){
+
+  let valor = campo.value.replace(/\D/g,'');
+
+  valor = valor.replace(/^(\d{2})(\d)/g,'($1) $2');
+  valor = valor.replace(/(\d{5})(\d)/,'$1-$2');
+
+  campo.value = valor;
+
+}
+</script>
+
+
+</body>
+</html>
